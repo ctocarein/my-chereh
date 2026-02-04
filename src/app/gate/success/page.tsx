@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import RequireAuth from "@/components/auth/RequireAuth";
 
-export default function GateSuccessPage() {
+function GateSuccessContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextHref = useMemo(() => {
@@ -44,5 +44,13 @@ export default function GateSuccessPage() {
         </main>
       </div>
     </RequireAuth>
+  );
+}
+
+export default function GateSuccessPage() {
+  return (
+    <Suspense fallback={null}>
+      <GateSuccessContent />
+    </Suspense>
   );
 }

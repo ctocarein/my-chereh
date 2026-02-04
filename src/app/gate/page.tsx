@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { Suspense, useEffect, useMemo, useState, type MouseEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import RequireAuth from "@/components/auth/RequireAuth";
@@ -14,7 +14,7 @@ import {
   storeSecurityGate,
 } from "@/lib/security";
 
-export default function GatePage() {
+function GateContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [securityGate, setSecurityGate] = useState<SecurityGate | null>(null);
@@ -264,5 +264,13 @@ export default function GatePage() {
         </main>
       </div>
     </RequireAuth>
+  );
+}
+
+export default function GatePage() {
+  return (
+    <Suspense fallback={null}>
+      <GateContent />
+    </Suspense>
   );
 }

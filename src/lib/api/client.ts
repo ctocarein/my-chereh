@@ -36,6 +36,8 @@ type RetryRequestMeta = {
   canRetry: boolean;
 };
 
+const getWindowStore = () => window as unknown as Record<string, unknown>;
+
 const isFormBody = (body: unknown) =>
   body instanceof FormData ||
   body instanceof URLSearchParams ||
@@ -112,15 +114,15 @@ export class ApiClient {
       !isFormBody(init.body);
     if (typeof window !== "undefined") {
       try {
-        (window as Window & { [key: string]: unknown })[retryRequestMetaKey] = {
+        const windowStore = getWindowStore();
+        windowStore[retryRequestMetaKey] = {
           canRetry,
         } satisfies RetryRequestMeta;
         if (canRetry) {
-          (window as Window & { [key: string]: unknown })[retryRequestKey] = () =>
+          windowStore[retryRequestKey] = () =>
             this.request(path, init);
         } else {
-          (window as Window & { [key: string]: unknown })[retryRequestKey] =
-            undefined;
+          windowStore[retryRequestKey] = undefined;
         }
       } catch {
         // Ignore storage failures.
@@ -137,23 +139,21 @@ export class ApiClient {
     } catch (error) {
       if (typeof window !== "undefined") {
         try {
+          const windowStore = getWindowStore();
           const guard = "__cherehNetworkErrorNotified";
-          const alreadyNotified = (window as Window & { [key: string]: boolean })[
-            guard
-          ];
+          const alreadyNotified = windowStore[guard] as boolean | undefined;
           if (!alreadyNotified) {
-            (window as Window & { [key: string]: boolean })[guard] = true;
-            const meta =
-              (window as Window & { [key: string]: RetryRequestMeta | undefined })[
-                retryRequestMetaKey
-              ];
+            windowStore[guard] = true;
+            const meta = windowStore[retryRequestMetaKey] as
+              | RetryRequestMeta
+              | undefined;
             window.dispatchEvent(
               new CustomEvent(networkErrorEventName, {
                 detail: { canRetry: meta?.canRetry === true },
               }),
             );
             window.setTimeout(() => {
-              (window as Window & { [key: string]: boolean })[guard] = false;
+              windowStore[guard] = false;
             }, 3000);
           }
         } catch {

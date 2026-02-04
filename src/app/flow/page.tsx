@@ -40,7 +40,7 @@ type Answer = {
 type FlowAnswerInput = string | string[] | File;
 
 type StoredFlowState = {
-  version: 4;
+  version: 3 | 4;
   answers: Answer[];
   messages: ChatMessage[];
   questionHistory: Question[];

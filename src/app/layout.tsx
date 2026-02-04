@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import AuthRedirectListener from "@/components/auth/AuthRedirectListener";
 import ReferralCapture from "@/components/referrals/ReferralCapture";
@@ -45,7 +46,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.variable} antialiased`}>
         <AuthRedirectListener />
-        <ReferralCapture />
+        <Suspense fallback={null}>
+          <ReferralCapture />
+        </Suspense>
         <NetworkErrorToast />
         {children}
       </body>

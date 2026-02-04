@@ -32,7 +32,7 @@ export default function NetworkErrorToast() {
     setRetryError(null);
     setIsRetrying(true);
     try {
-      const retryFn = (window as Window & { [key: string]: unknown })[
+      const retryFn = (window as unknown as Record<string, unknown>)[
         "__cherehRetryLastRequest"
       ];
       if (typeof retryFn === "function") {

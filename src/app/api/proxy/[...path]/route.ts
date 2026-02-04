@@ -68,17 +68,13 @@ const forwardRequest = async (request: Request, pathSegments?: string[]) => {
 };
 
 type RouteContext = {
-  params?:
-    | Promise<{
-        path?: string[];
-      }>
-    | {
-        path?: string[];
-      };
+  params: Promise<{
+    path?: string[];
+  }>;
 };
 
 const handle = async (request: Request, context: RouteContext) => {
-  const resolvedParams = await Promise.resolve(context.params);
+  const resolvedParams = await context.params;
   return forwardRequest(request, resolvedParams?.path);
 };
 
