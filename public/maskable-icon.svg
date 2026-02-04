@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Chereh">
+  <rect width="512" height="512" fill="#0097a7" />
+  <path
+    d="M336 188c-22-26-54-40-92-40-68 0-120 52-120 116s52 116 120 116c38 0 70-14 92-40"
+    fill="none"
+    stroke="#e1007a"
+    stroke-width="40"
+    stroke-linecap="round"
+  />
+</svg>
