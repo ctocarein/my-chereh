@@ -67,7 +67,7 @@ export const captureReferralFromSearchParams = (
   return code;
 };
 
-const normalizeBaseUrl = (value: string) => value.replace(/\/$/, "");
+import { getPublicApiBaseUrl, normalizeBaseUrl } from "@/lib/api/base-url";
 
 export const getReferralBaseUrl = () => {
   const envBase = process.env.NEXT_PUBLIC_REFERRAL_BASE_URL?.trim();
@@ -75,12 +75,7 @@ export const getReferralBaseUrl = () => {
     return normalizeBaseUrl(envBase);
   }
 
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
-  if (apiBase) {
-    return normalizeBaseUrl(apiBase);
-  }
-
-  return "";
+  return getPublicApiBaseUrl();
 };
 
 export const buildReferralUrl = (code: string) => {

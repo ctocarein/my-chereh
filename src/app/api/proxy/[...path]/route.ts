@@ -1,11 +1,4 @@
-const normalizeBaseUrl = (value: string) => value.replace(/\/$/, "");
-
-const resolveApiBaseUrl = () =>
-  normalizeBaseUrl(
-    process.env.API_BASE_URL ??
-      process.env.NEXT_PRIVATE_API_BASE_URL ??
-      "https://api.triage.carein:8443/api",
-  );
+import { getServerApiBaseUrl } from "@/lib/api/base-url";
 
 const getPathFromRequest = (request: Request) => {
   const { pathname } = new URL(request.url);
@@ -25,7 +18,7 @@ const forwardRequest = async (request: Request, pathSegments?: string[]) => {
   const path = pathSegments?.length
     ? `/${pathSegments.join("/")}`
     : getPathFromRequest(request);
-  const url = `${resolveApiBaseUrl()}${path}`;
+  const url = `${getServerApiBaseUrl()}${path}`;
   const headers = new Headers(request.headers);
   headers.delete("host");
   headers.delete("content-length");

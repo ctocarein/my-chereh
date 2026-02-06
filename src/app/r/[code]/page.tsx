@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getServerApiBaseUrl } from "@/lib/api/base-url";
 
 type PageProps = {
   params?: Promise<{
@@ -6,13 +7,8 @@ type PageProps = {
   }>;
 };
 
-const getReferralApiBase = () =>
-  process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
-  "https://api.triage.carein:8443/api";
-
 const buildReferralApiUrl = (code: string) => {
-  const base = getReferralApiBase().replace(/\/$/, "");
-  return `${base}/r/${encodeURIComponent(code)}`;
+  return `${getServerApiBaseUrl()}/r/${encodeURIComponent(code)}`;
 };
 
 export default async function ReferralRedirectPage({ params }: PageProps) {

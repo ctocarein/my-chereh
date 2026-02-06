@@ -1,3 +1,5 @@
+import { getPublicApiBaseUrl, normalizeBaseUrl } from "./base-url";
+
 export type ApiClientOptions = {
   baseUrl?: string;
   getAccessToken?: () => string | null | Promise<string | null>;
@@ -20,8 +22,6 @@ export class ApiError extends Error {
   }
 }
 
-const normalizeBaseUrl = (value: string) => value.replace(/\/$/, "");
-const DEFAULT_BASE_URL = "https://api.triage.carein:8443/api";
 const authTokenStorageKey = "chereh_auth_token";
 const legacyAccountStorageKey = "chereh_account";
 const identityStorageKey = "chereh_identity";
@@ -75,12 +75,10 @@ export class ApiClient {
   private fetchFn: typeof fetch;
 
   constructor(options: ApiClientOptions = {}) {
-    const envBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
-    const resolvedBaseUrl =
-      options.baseUrl ??
-      (envBaseUrl?.trim() ? envBaseUrl : undefined) ??
-      DEFAULT_BASE_URL;
-    this.baseUrl = normalizeBaseUrl(resolvedBaseUrl);
+    const resolvedBaseUrl = options.baseUrl?.trim()
+      ? normalizeBaseUrl(options.baseUrl)
+      : getPublicApiBaseUrl();
+    this.baseUrl = resolvedBaseUrl;
     this.getAccessToken = options.getAccessToken;
     this.fetchFn = options.fetchFn ?? fetch;
   }
