@@ -25,6 +25,8 @@ export default function Home() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [startHref, setStartHref] = useState("/consent");
   const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -95,15 +97,49 @@ export default function Home() {
       setInstallPrompt(event);
     };
 
+    const updateInstallState = () => {
+      const isIosStandalone =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (window.navigator as any).standalone === true;
+      const isAndroidReferrer = document.referrer.startsWith("android-app://");
+      const standaloneQuery = window.matchMedia("(display-mode: standalone)");
+      const browserQuery = window.matchMedia("(display-mode: browser)");
+      const isBrowserMode =
+        browserQuery.media !== "not all" && browserQuery.matches;
+      const isStandalone = standaloneQuery.matches && !isBrowserMode;
+      const nextInstalled = isIosStandalone || isAndroidReferrer || isStandalone;
+
+      setIsInstalled(!installPrompt && nextInstalled);
+    };
+
+    const mediaQuery = window.matchMedia("(display-mode: standalone)");
+
     window.addEventListener("beforeinstallprompt", handleBeforeInstall);
+
+    updateInstallState();
+    window.addEventListener("appinstalled", updateInstallState);
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", updateInstallState);
+    } else {
+      mediaQuery.addListener(updateInstallState);
+    }
 
     return () => {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+      window.removeEventListener("appinstalled", updateInstallState);
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener("change", updateInstallState);
+      } else {
+        mediaQuery.removeListener(updateInstallState);
+      }
     };
-  }, []);
+  }, [installPrompt]);
 
   const handleInstallClick = async () => {
+    setShowInstallHelp(false);
+
     if (!installPrompt) {
+      setShowInstallHelp(true);
       return;
     }
 
@@ -179,22 +215,29 @@ export default function Home() {
         </div>
       </main>
       <div className="page__actions page__content w-full">
-        {installPrompt && (
-          <button
-            type="button"
-            className="btn btn-outline w-full"
-            onClick={handleInstallClick}
-          >
-            Installer l&apos;application
-          </button>
-        )}
         <button
           type="button"
-          className="btn btn-primary w-full"
-          onClick={() => router.push(startHref)}
+          className="btn btn-outline w-full"
+          onClick={handleInstallClick}
         >
-          Commencer
+          Installer l&apos;application
         </button>
+        {showInstallHelp && !isInstalled && (
+          <p className="swipe__text text-sm text-center">
+            Sur Firefox, ouvrez le menu ⋮ puis choisissez
+            {" "}
+            &quot;Installer l&apos;application&quot;.
+          </p>
+        )}
+        {isInstalled && (
+          <button
+            type="button"
+            className="btn btn-primary w-full"
+            onClick={() => router.push(startHref)}
+          >
+            Commencer
+          </button>
+        )}
       </div>
     </div>
   );

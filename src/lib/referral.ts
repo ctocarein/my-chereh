@@ -75,7 +75,7 @@ export const getReferralBaseUrl = () => {
     return normalizeBaseUrl(envBase);
   }
 
-  return normalizeBaseUrl("https://triage.carein.cloud");
+  return normalizeBaseUrl("https://on.dev.chereh.com");
 };
 
 export const buildReferralUrl = (code: string) => {
