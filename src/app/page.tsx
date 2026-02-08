@@ -24,6 +24,7 @@ export default function Home() {
   const swipeRef = useRef<HTMLDivElement | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [startHref, setStartHref] = useState("/consent");
+  const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -88,6 +89,37 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    const handleBeforeInstall = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstall);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstall);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!installPrompt) {
+      return;
+    }
+
+    const promptEvent = installPrompt as unknown as {
+      prompt: () => Promise<void>;
+      userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+    };
+
+    try {
+      await promptEvent.prompt();
+      await promptEvent.userChoice;
+    } finally {
+      setInstallPrompt(null);
+    }
+  };
+
   const scrollToSlide = (index: number) => {
     const container = swipeRef.current;
     const slide = container?.children.item(index) as HTMLElement | null;
@@ -147,6 +179,15 @@ export default function Home() {
         </div>
       </main>
       <div className="page__actions page__content w-full">
+        {installPrompt && (
+          <button
+            type="button"
+            className="btn btn-outline w-full"
+            onClick={handleInstallClick}
+          >
+            Installer l&apos;application
+          </button>
+        )}
         <button
           type="button"
           className="btn btn-primary w-full"
