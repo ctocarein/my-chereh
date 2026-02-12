@@ -40,7 +40,7 @@ type Answer = {
 type FlowAnswerInput = string | string[] | File;
 
 type StoredFlowState = {
-  version: 3 | 4;
+  version: 3 | 4 | 5;
   answers: Answer[];
   messages: ChatMessage[];
   questionHistory: Question[];
@@ -50,11 +50,23 @@ type StoredFlowState = {
   sessionPublicId?: string | null;
   completionMessage?: string | null;
   ownerId?: string | null;
+  sessionStatus?: string | null;
+  routingStatus?: string | null;
+  routingReason?: string | null;
+  terminationType?: string | null;
 };
 
 const flowStorageKey = "evaluation-flow-v1";
 const defaultCompletionPrompt =
   "Merci. Je prepare une orientation claire et rassurante.";
+const consentDeclinedEndMessage =
+  "Merci pour votre temps. Votre session est terminee sans recommandation.";
+const consentDeclinedStepMessages = {
+  consent_declined_thank_you: "Merci pour votre retour.",
+  consent_declined_whatsapp:
+    "Si vous souhaitez reprendre plus tard, contactez-nous via WhatsApp.",
+  consent_declined_end: consentDeclinedEndMessage,
+} as const;
 const evaluationType =
   process.env.NEXT_PUBLIC_EVALUATION_TYPE ?? "complete";
 const shouldLog = process.env.NEXT_PUBLIC_FLOW_DEBUG === "true";
@@ -307,6 +319,143 @@ const extractEvaluationQuestion = (payload: {
   payload.session?.currentQuestion ??
   null;
 
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
+
+const pickString = (...values: unknown[]) => {
+  for (const value of values) {
+    if (typeof value !== "string") {
+      continue;
+    }
+    const trimmed = value.trim();
+    if (trimmed) {
+      return trimmed;
+    }
+  }
+  return null;
+};
+
+type FlowRoutingSnapshot = {
+  action: string | null;
+  blocKey: string | null;
+  status: string | null;
+  reason: string | null;
+  hasSignals: boolean;
+};
+
+const extractRoutingSnapshot = (payload: unknown): FlowRoutingSnapshot => {
+  const record = asRecord(payload);
+  const routing = asRecord(record?.routing);
+  const action = pickString(routing?.action)?.toLowerCase() ?? null;
+  const blocKey =
+    pickString(routing?.bloc_key, routing?.blocKey)?.toLowerCase() ?? null;
+  const status = pickString(routing?.status)?.toLowerCase() ?? null;
+  const reason = pickString(routing?.reason)?.toLowerCase() ?? null;
+
+  return {
+    action,
+    blocKey,
+    status,
+    reason,
+    hasSignals: Boolean(action || blocKey || status || reason),
+  };
+};
+
+const extractSessionStatus = (payload: unknown) => {
+  const record = asRecord(payload);
+  const session = asRecord(record?.session);
+  return pickString(session?.status)?.toLowerCase() ?? null;
+};
+
+const extractTerminationType = (payload: unknown) => {
+  const record = asRecord(payload);
+  const context = asRecord(record?.context);
+  return (
+    pickString(context?.termination_type, context?.terminationType)?.toLowerCase() ??
+    null
+  );
+};
+
+type FlowSessionOutcome = {
+  isDone: boolean;
+  shouldSuppressRecommendation: boolean;
+  isConsentDeclinedJump: boolean;
+  isConsentDeclined: boolean;
+  sessionStatus: string | null;
+  routingStatus: string | null;
+  routingReason: string | null;
+  terminationType: string | null;
+};
+
+const resolveFlowSessionOutcome = (
+  payload: unknown,
+  hasNextQuestion: boolean,
+): FlowSessionOutcome => {
+  const record = asRecord(payload);
+  const routing = extractRoutingSnapshot(payload);
+  const sessionStatus = extractSessionStatus(payload);
+  const terminationType = extractTerminationType(payload);
+  const isComplete = record?.isComplete === true;
+  const isConsentDeclinedJump =
+    routing.action === "jump_bloc" && routing.blocKey === "consent_declined";
+  const isCancelled =
+    sessionStatus === "cancelled" || routing.status === "cancelled";
+  const isDoneByRouting = routing.action === "end_session";
+  const isDoneByStatus =
+    sessionStatus === "completed" ||
+    sessionStatus === "cancelled" ||
+    sessionStatus === "expired" ||
+    routing.status === "completed" ||
+    routing.status === "cancelled";
+  const isDoneByLegacyFallback = !routing.hasSignals && !hasNextQuestion;
+  const isDone =
+    isConsentDeclinedJump ||
+    isComplete ||
+    isDoneByRouting ||
+    isDoneByStatus ||
+    isDoneByLegacyFallback;
+  const isConsentDeclined =
+    routing.reason === "consent_declined" ||
+    terminationType === "consent_declined" ||
+    isConsentDeclinedJump;
+
+  return {
+    isDone,
+    shouldSuppressRecommendation:
+      isCancelled ||
+      terminationType === "abandon" ||
+      routing.reason === "consent_declined",
+    isConsentDeclinedJump,
+    isConsentDeclined,
+    sessionStatus,
+    routingStatus: routing.status,
+    routingReason: routing.reason,
+    terminationType,
+  };
+};
+
+const buildConsentDeclinedMessages = () =>
+  [
+    consentDeclinedStepMessages.consent_declined_thank_you,
+    consentDeclinedStepMessages.consent_declined_whatsapp,
+    consentDeclinedStepMessages.consent_declined_end,
+  ].map((text) => createMessage("bot", text));
+
+const resolveCompletionText = (
+  outcome: FlowSessionOutcome,
+  message: string,
+) => {
+  if (outcome.isConsentDeclined) {
+    return consentDeclinedEndMessage;
+  }
+  if (outcome.shouldSuppressRecommendation && message === defaultCompletionPrompt) {
+    return "La session est terminee.";
+  }
+  return message;
+};
+
 const logResolvedSessionIds = (
   label: string,
   ids: ReturnType<typeof extractSessionIds>,
@@ -496,6 +645,10 @@ export default function FlowPage() {
     defaultCompletionPrompt,
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [sessionStatus, setSessionStatus] = useState<string | null>(null);
+  const [routingStatus, setRoutingStatus] = useState<string | null>(null);
+  const [routingReason, setRoutingReason] = useState<string | null>(null);
+  const [terminationType, setTerminationType] = useState<string | null>(null);
   const [referralError, setReferralError] = useState<ReferralStartError | null>(
     null,
   );
@@ -517,6 +670,14 @@ export default function FlowPage() {
 
   const evaluationSessionId = sessionInternalId ?? null;
   const answersSessionId = sessionPublicId ?? sessionInternalId ?? null;
+  const isConsentDeclined =
+    routingReason === "consent_declined" ||
+    terminationType === "consent_declined";
+  const shouldSuppressRecommendation =
+    sessionStatus === "cancelled" ||
+    routingStatus === "cancelled" ||
+    terminationType === "abandon" ||
+    isConsentDeclined;
 
   const progressDenominator = answers.length + (currentQuestion ? 1 : 0);
   const progressValue = isComplete
@@ -541,6 +702,10 @@ export default function FlowPage() {
     console.info("flow state snapshot", {
       sessionInternalId,
       sessionPublicId,
+      sessionStatus,
+      routingStatus,
+      routingReason,
+      terminationType,
       isComplete,
       isBotTyping,
       errorMessage,
@@ -561,6 +726,10 @@ export default function FlowPage() {
     questionHistory.length,
     sessionInternalId,
     sessionPublicId,
+    sessionStatus,
+    routingStatus,
+    routingReason,
+    terminationType,
   ]);
 
   useEffect(() => {
@@ -603,15 +772,25 @@ export default function FlowPage() {
         const nextAnswersSessionId = pickPublicSessionId(nextSessionIds);
         const nextMessage =
           (state as { message?: string }).message ?? defaultCompletionPrompt;
-        setCompletionMessage(nextMessage);
-        const isDone =
-          state.isComplete === true ||
-          state.session?.status === "completed";
-        const resolvedQuestion = !isDone
-          ? extractEvaluationQuestion(state)
+        const resolvedQuestion = extractEvaluationQuestion(state);
+        const nextQuestion = resolvedQuestion
+          ? normalizeQuestion(resolvedQuestion)
           : null;
-        if (resolvedQuestion) {
-          const nextQuestion = normalizeQuestion(resolvedQuestion);
+        const outcome = resolveFlowSessionOutcome(state, Boolean(nextQuestion));
+        setSessionStatus(outcome.sessionStatus);
+        setRoutingStatus(outcome.routingStatus);
+        setRoutingReason(outcome.routingReason);
+        setTerminationType(outcome.terminationType);
+        if (outcome.isConsentDeclinedJump) {
+          setCompletionMessage(consentDeclinedEndMessage);
+          setQuestionHistory([]);
+          setMessages(buildConsentDeclinedMessages());
+          setIsComplete(true);
+          return;
+        }
+        const completionText = resolveCompletionText(outcome, nextMessage);
+        setCompletionMessage(completionText);
+        if (nextQuestion && !outcome.isDone) {
           setQuestionHistory([nextQuestion]);
           setMessages([createMessage("bot", getQuestionText(nextQuestion), 0)]);
           setIsComplete(false);
@@ -656,7 +835,7 @@ export default function FlowPage() {
                         [nextQuestion],
                         nextAnswers,
                         false,
-                        nextMessage,
+                        completionText,
                       ),
                   );
                 }
@@ -665,9 +844,11 @@ export default function FlowPage() {
                 // Ignore answers hydration failures.
               });
           }
-        } else if (isDone) {
+        } else if (outcome.isDone) {
           setQuestionHistory([]);
-          setMessages([createMessage("bot", nextMessage)]);
+          setMessages([
+            createMessage("bot", completionText),
+          ]);
           setIsComplete(true);
         } else {
           void startNewEvaluation();
@@ -690,6 +871,10 @@ export default function FlowPage() {
     const startNewEvaluation = async () => {
       setErrorMessage(null);
       setReferralError(null);
+      setSessionStatus(null);
+      setRoutingStatus(null);
+      setRoutingReason(null);
+      setTerminationType(null);
       setIsBotTyping(true);
       const requestId = (requestIdRef.current += 1);
 
@@ -750,15 +935,34 @@ export default function FlowPage() {
 
         const nextMessage =
           (response as { message?: string }).message ?? defaultCompletionPrompt;
-        setCompletionMessage(nextMessage);
-
         const initialQuestion = extractEvaluationQuestion(response);
-        if (initialQuestion) {
+        const nextQuestion = initialQuestion
+          ? normalizeQuestion(initialQuestion)
+          : null;
+        const outcome = resolveFlowSessionOutcome(
+          response,
+          Boolean(nextQuestion),
+        );
+        setSessionStatus(outcome.sessionStatus);
+        setRoutingStatus(outcome.routingStatus);
+        setRoutingReason(outcome.routingReason);
+        setTerminationType(outcome.terminationType);
+        if (outcome.isConsentDeclinedJump) {
+          setAnswers([]);
+          setCompletionMessage(consentDeclinedEndMessage);
+          setQuestionHistory([]);
+          setMessages(buildConsentDeclinedMessages());
+          setIsComplete(true);
+          return;
+        }
+        const completionText = resolveCompletionText(outcome, nextMessage);
+        setCompletionMessage(completionText);
+
+        if (nextQuestion && !outcome.isDone) {
           if (shouldLog) {
             // eslint-disable-next-line no-console
             console.info("startEvaluation initial question", initialQuestion);
           }
-          const nextQuestion = normalizeQuestion(initialQuestion);
           setAnswers([]);
           setQuestionHistory([nextQuestion]);
           setMessages([createMessage("bot", getQuestionText(nextQuestion), 0)]);
@@ -774,7 +978,7 @@ export default function FlowPage() {
         }
         setAnswers([]);
         setQuestionHistory([]);
-        setMessages([createMessage("bot", nextMessage)]);
+        setMessages([createMessage("bot", completionText)]);
         setIsComplete(true);
       } catch (error) {
         if (requestIdRef.current !== requestId) {
@@ -839,26 +1043,36 @@ export default function FlowPage() {
         }
         const nextMessage =
           (state as { message?: string }).message ?? defaultCompletionPrompt;
-        setCompletionMessage(nextMessage);
-        const isDone =
-          state.isComplete === true ||
-          state.session?.status === "completed";
-        const resolvedQuestion = !isDone
-          ? extractEvaluationQuestion(state)
+        const resolvedQuestion = extractEvaluationQuestion(state);
+        const nextQuestion = resolvedQuestion
+          ? normalizeQuestion(resolvedQuestion)
           : null;
+        const outcome = resolveFlowSessionOutcome(state, Boolean(nextQuestion));
+        setSessionStatus(outcome.sessionStatus);
+        setRoutingStatus(outcome.routingStatus);
+        setRoutingReason(outcome.routingReason);
+        setTerminationType(outcome.terminationType);
+        if (outcome.isConsentDeclinedJump) {
+          setCompletionMessage(consentDeclinedEndMessage);
+          setQuestionHistory([]);
+          setMessages(buildConsentDeclinedMessages());
+          setIsComplete(true);
+          return;
+        }
+        const completionText = resolveCompletionText(outcome, nextMessage);
+        setCompletionMessage(completionText);
 
-        if (resolvedQuestion) {
+        if (nextQuestion && !outcome.isDone) {
           if (shouldLog) {
             // eslint-disable-next-line no-console
             console.info("hydrateStoredSession resolved question", resolvedQuestion);
           }
-          const nextQuestion = normalizeQuestion(resolvedQuestion);
           setQuestionHistory([nextQuestion]);
           setMessages([
             createMessage("bot", getQuestionText(nextQuestion), 0),
           ]);
           setIsComplete(false);
-        } else if (!isDone) {
+        } else if (!outcome.isDone) {
           if (shouldLog) {
             // eslint-disable-next-line no-console
             console.warn("hydrateStoredSession empty question, restarting");
@@ -866,6 +1080,10 @@ export default function FlowPage() {
             clearStoredFlow("hydrate:missing-question");
             setSessionInternalId(null);
             setSessionPublicId(null);
+            setSessionStatus(null);
+            setRoutingStatus(null);
+            setRoutingReason(null);
+            setTerminationType(null);
             setQuestionHistory([]);
             setMessages([]);
             setIsComplete(false);
@@ -877,7 +1095,9 @@ export default function FlowPage() {
             console.info("hydrateStoredSession completed", nextMessage);
           }
           setQuestionHistory([]);
-          setMessages([createMessage("bot", nextMessage)]);
+          setMessages([
+            createMessage("bot", completionText),
+          ]);
           setIsComplete(true);
         }
       } catch (error) {
@@ -914,7 +1134,7 @@ export default function FlowPage() {
       if (raw) {
         try {
           const stored = JSON.parse(raw) as StoredFlowState;
-          if (stored?.version === 3 || stored?.version === 4) {
+          if (stored?.version === 3 || stored?.version === 4 || stored?.version === 5) {
             if (identityId && stored.ownerId && stored.ownerId !== identityId) {
               clearStoredFlow("owner-mismatch");
               void hydrateCurrentEvaluation();
@@ -991,6 +1211,26 @@ export default function FlowPage() {
             setSessionInternalId(storedIds.internalId);
             setSessionPublicId(storedIds.publicId);
             setCompletionMessage(storedCompletion);
+            setSessionStatus(
+              typeof stored.sessionStatus === "string"
+                ? stored.sessionStatus
+                : null,
+            );
+            setRoutingStatus(
+              typeof stored.routingStatus === "string"
+                ? stored.routingStatus
+                : null,
+            );
+            setRoutingReason(
+              typeof stored.routingReason === "string"
+                ? stored.routingReason
+                : null,
+            );
+            setTerminationType(
+              typeof stored.terminationType === "string"
+                ? stored.terminationType
+                : null,
+            );
             setIsBotTyping(false);
             setErrorMessage(null);
             hasHydratedRef.current = true;
@@ -1077,7 +1317,7 @@ export default function FlowPage() {
     }
 
     const payload: StoredFlowState = {
-      version: 4,
+      version: 5,
       answers,
       messages,
       questionHistory,
@@ -1087,6 +1327,10 @@ export default function FlowPage() {
       sessionPublicId,
       completionMessage,
       ownerId: ownerIdRef.current ?? null,
+      sessionStatus,
+      routingStatus,
+      routingReason,
+      terminationType,
     };
 
     const hasMeaningfulState =
@@ -1132,6 +1376,10 @@ export default function FlowPage() {
     sessionInternalId,
     sessionPublicId,
     completionMessage,
+    sessionStatus,
+    routingStatus,
+    routingReason,
+    terminationType,
   ]);
 
   useLayoutEffect(() => {
@@ -1278,14 +1526,25 @@ export default function FlowPage() {
         : null;
       const nextMessage =
         (response as { message?: string }).message ?? completionMessage;
-      setCompletionMessage(nextMessage);
+      const outcome = resolveFlowSessionOutcome(response, Boolean(nextQuestion));
+      setSessionStatus(outcome.sessionStatus);
+      setRoutingStatus(outcome.routingStatus);
+      setRoutingReason(outcome.routingReason);
+      setTerminationType(outcome.terminationType);
+      if (outcome.isConsentDeclinedJump) {
+        setCompletionMessage(consentDeclinedEndMessage);
+        setQuestionHistory([]);
+        setMessages((prev) => [...prev, ...buildConsentDeclinedMessages()]);
+        setIsComplete(true);
+        setIsBotTyping(false);
+        return;
+      }
+      const completionText = resolveCompletionText(outcome, nextMessage);
+      setCompletionMessage(completionText);
       const nextText = nextQuestion
         ? getQuestionText(nextQuestion)
-        : nextMessage;
-      const isDone =
-        response.isComplete === true ||
-        response.session?.status === "completed" ||
-        !nextQuestion;
+        : completionText;
+      const isDone = outcome.isDone;
       const delay = getTypingDelay(nextText);
 
       timeoutRef.current = window.setTimeout(() => {
@@ -1355,7 +1614,7 @@ export default function FlowPage() {
 
     const isReferralPublic = looksLikeUuid(referralError.sessionId);
     const payload: StoredFlowState = {
-      version: 4,
+      version: 5,
       answers: [],
       messages: [],
       questionHistory: [],
@@ -1365,6 +1624,10 @@ export default function FlowPage() {
       sessionPublicId: isReferralPublic ? referralError.sessionId : null,
       completionMessage: defaultCompletionPrompt,
       ownerId: ownerIdRef.current ?? null,
+      sessionStatus: null,
+      routingStatus: null,
+      routingReason: null,
+      terminationType: null,
     };
 
     try {
@@ -1480,9 +1743,22 @@ export default function FlowPage() {
             />
           ) : null}
           {isComplete && !isBotTyping ? (
-            <Link className="btn btn-primary w-full" href="/result">
-              Voir mon orientation
-            </Link>
+            shouldSuppressRecommendation ? (
+              <>
+                <div className="chat-input__error" style={{ color: "var(--text)", marginBottom: "10px" }}>
+                  {isConsentDeclined
+                    ? "Merci pour votre retour. Cette session est bien terminee sans recommandation."
+                    : "La session est terminee."}
+                </div>
+                <Link className="btn btn-primary w-full" href="/">
+                  Retour a l'accueil
+                </Link>
+              </>
+            ) : (
+              <Link className="btn btn-primary w-full" href="/result">
+                Voir mon orientation
+              </Link>
+            )
           ) : null}
         </div>
       </main>

@@ -51,7 +51,8 @@ export type EvaluationSessionStatus =
   | "draft"
   | "in_progress"
   | "completed"
-  | "expired";
+  | "expired"
+  | "cancelled";
 
 export type EvaluationSession = {
   id: string | number;
@@ -100,9 +101,25 @@ export type StartEvaluationResponse = {
   report?: EvaluationReport | null;
   message?: string;
   score?: number;
+  routing?: EvaluationRouting | null;
+  context?: EvaluationContext | null;
 };
 
 export type EvaluationQuestionOption = string | { value: string; label: string };
+
+export type EvaluationRouting = {
+  action?: string;
+  bloc_key?: string;
+  blocKey?: string;
+  status?: string;
+  reason?: string;
+};
+
+export type EvaluationContext = {
+  termination_type?: string;
+  terminationType?: string;
+  [key: string]: unknown;
+};
 
 export type EvaluationQuestion = {
   id: string | number;
@@ -180,6 +197,8 @@ export type EvaluationAdvanceResponse = {
   score?: number;
   insight?: EvaluationInsight | null;
   report?: EvaluationReport | null;
+  routing?: EvaluationRouting | null;
+  context?: EvaluationContext | null;
 };
 
 export type EvaluationNextResponse = EvaluationAdvanceResponse;
@@ -192,6 +211,8 @@ export type EvaluationStateResponse = {
   message?: string;
   insight?: EvaluationInsight | null;
   report?: EvaluationReport | null;
+  routing?: EvaluationRouting | null;
+  context?: EvaluationContext | null;
 };
 
 export type EvaluationCompleteResponse = {
@@ -201,6 +222,8 @@ export type EvaluationCompleteResponse = {
   report?: EvaluationReport | null;
   message?: string;
   reportId?: string;
+  routing?: EvaluationRouting | null;
+  context?: EvaluationContext | null;
 };
 
 export type ThematicBloc = {
