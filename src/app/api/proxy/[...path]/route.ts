@@ -14,6 +14,8 @@ if (process.env.ALLOW_SELF_SIGNED_CERTS === "1") {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 }
 
+const isApiDebugEnabled = process.env.API_DEBUG === "1";
+
 const forwardRequest = async (request: Request, pathSegments?: string[]) => {
   const path = pathSegments?.length
     ? `/${pathSegments.join("/")}`
@@ -28,6 +30,15 @@ const forwardRequest = async (request: Request, pathSegments?: string[]) => {
   const body = await request.arrayBuffer();
 
   try {
+    if (isApiDebugEnabled) {
+      // eslint-disable-next-line no-console
+      console.info("[proxy][request]", {
+        method: request.method,
+        incomingUrl: request.url,
+        upstreamUrl: url,
+      });
+    }
+
     const response = await fetch(url, {
       method: request.method,
       headers,
@@ -36,6 +47,22 @@ const forwardRequest = async (request: Request, pathSegments?: string[]) => {
     });
 
     const responseBody = await response.arrayBuffer();
+    if (isApiDebugEnabled) {
+      const contentType = response.headers.get("content-type") ?? "";
+      const textPreview = contentType.includes("application/json") ||
+        contentType.startsWith("text/")
+        ? new TextDecoder().decode(responseBody).slice(0, 1000)
+        : undefined;
+      // eslint-disable-next-line no-console
+      console.info("[proxy][response]", {
+        method: request.method,
+        upstreamUrl: url,
+        status: response.status,
+        statusText: response.statusText,
+        contentType,
+        bodyPreview: response.ok ? undefined : textPreview,
+      });
+    }
     return new Response(responseBody, {
       status: response.status,
       statusText: response.statusText,

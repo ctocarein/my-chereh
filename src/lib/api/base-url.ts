@@ -1,5 +1,5 @@
 const DEFAULT_SERVER_API_BASE_URL = "https://triage.carein.cloud/api";
-const DEFAULT_PUBLIC_API_BASE_URL = "/api/proxy";
+const DEFAULT_PUBLIC_API_BASE_URL = DEFAULT_SERVER_API_BASE_URL;
 
 export const normalizeBaseUrl = (value: string) => value.replace(/\/$/, "");
 

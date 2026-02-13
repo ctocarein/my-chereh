@@ -31,12 +31,25 @@ const unauthenticatedEventName = "chereh:unauthenticated";
 const networkErrorEventName = "chereh:network-error";
 const retryRequestKey = "__cherehRetryLastRequest";
 const retryRequestMetaKey = "__cherehRetryLastRequestMeta";
+const debugApiEnvEnabled = process.env.NEXT_PUBLIC_DEBUG_API === "1";
+const debugApiStorageKey = "chereh_debug_api";
 
 type RetryRequestMeta = {
   canRetry: boolean;
 };
 
 const getWindowStore = () => window as unknown as Record<string, unknown>;
+
+const isClientApiDebugEnabled = () => {
+  if (!debugApiEnvEnabled || typeof window === "undefined") {
+    return false;
+  }
+  try {
+    return window.localStorage.getItem(debugApiStorageKey) !== "0";
+  } catch {
+    return true;
+  }
+};
 
 const isFormBody = (body: unknown) =>
   body instanceof FormData ||
@@ -85,6 +98,7 @@ export class ApiClient {
 
   async request<T>(path: string, init: ApiRequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}${path}`;
+    const debugEnabled = isClientApiDebugEnabled();
     const headers = new Headers(init.headers);
     const token = await this.getAccessToken?.();
     if (token && !headers.has("Authorization")) {
@@ -129,6 +143,15 @@ export class ApiClient {
 
     let response: Response;
     try {
+      if (debugEnabled) {
+        // eslint-disable-next-line no-console
+        console.info("[api][request]", {
+          method: init.method ?? "GET",
+          url,
+          baseUrl: this.baseUrl,
+          path,
+        });
+      }
       response = await this.fetchFn.call(globalThis, url, {
         ...init,
         headers,
@@ -166,7 +189,28 @@ export class ApiClient {
       ? await response.json()
       : await response.text();
 
+    if (debugEnabled) {
+      // eslint-disable-next-line no-console
+      console.info("[api][response]", {
+        method: init.method ?? "GET",
+        url,
+        status: response.status,
+        statusText: response.statusText,
+        contentType,
+      });
+    }
+
     if (!response.ok) {
+      if (debugEnabled) {
+        // eslint-disable-next-line no-console
+        console.error("[api][error]", {
+          method: init.method ?? "GET",
+          url,
+          status: response.status,
+          statusText: response.statusText,
+          data,
+        });
+      }
       if (
         response.status === 401 ||
         isUnauthenticatedPayload(data)
