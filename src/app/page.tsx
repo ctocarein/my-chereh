@@ -26,7 +26,6 @@ export default function Home() {
   const [startHref, setStartHref] = useState("/consent");
   const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [showInstallHelp, setShowInstallHelp] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -109,7 +108,7 @@ export default function Home() {
       const isStandalone = standaloneQuery.matches && !isBrowserMode;
       const nextInstalled = isIosStandalone || isAndroidReferrer || isStandalone;
 
-      setIsInstalled(!installPrompt && nextInstalled);
+      setIsInstalled(nextInstalled);
     };
 
     const mediaQuery = window.matchMedia("(display-mode: standalone)");
@@ -133,13 +132,10 @@ export default function Home() {
         mediaQuery.removeListener(updateInstallState);
       }
     };
-  }, [installPrompt]);
+  }, []);
 
   const handleInstallClick = async () => {
-    setShowInstallHelp(false);
-
     if (!installPrompt) {
-      setShowInstallHelp(true);
       return;
     }
 
@@ -150,7 +146,10 @@ export default function Home() {
 
     try {
       await promptEvent.prompt();
-      await promptEvent.userChoice;
+      const choice = await promptEvent.userChoice;
+      if (choice.outcome === "accepted") {
+        setIsInstalled(true);
+      }
     } finally {
       setInstallPrompt(null);
     }
@@ -214,31 +213,25 @@ export default function Home() {
           ))}
         </div>
       </main>
-      <div className="page__actions page__content w-full">
-        <button
-          type="button"
-          className="btn btn-outline w-full"
-          onClick={handleInstallClick}
-        >
-          Installer l&apos;application
-        </button>
-        {showInstallHelp && !isInstalled && (
-          <p className="swipe__text text-sm text-center">
-            Sur Firefox, ouvrez le menu ⋮ puis choisissez
-            {" "}
-            &quot;Installer l&apos;application&quot;.
-          </p>
-        )}
-        {isInstalled && (
+      <div className="page__actions page__content w-full flex flex-col gap-3">
+        {!isInstalled && installPrompt && (
           <button
             type="button"
-            className="btn btn-primary w-full"
-            onClick={() => router.push(startHref)}
+            className="btn btn-outline w-full"
+            onClick={handleInstallClick}
           >
-            Commencer
+            Installer l&apos;application
           </button>
         )}
+        <button
+          type="button"
+          className="btn btn-primary w-full"
+          onClick={() => router.push(startHref)}
+        >
+          Commencer
+        </button>
       </div>
     </div>
   );
 }
+
