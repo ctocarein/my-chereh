@@ -73,6 +73,8 @@ export default function ChatInputBar({
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [isDragActive, setIsDragActive] = useState(false);
+  const [selectOneQuery, setSelectOneQuery] = useState("");
+  const [isSelectOneOpen, setIsSelectOneOpen] = useState(false);
   const ratingPointerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -93,7 +95,22 @@ export default function ChatInputBar({
     setLocationError(null);
     setIsLocating(false);
     setIsDragActive(false);
+    setSelectOneQuery("");
+    setIsSelectOneOpen(false);
   }, [questionId, question.min]);
+
+  const filteredSelectOneOptions = useMemo(() => {
+    const query = selectOneQuery.trim().toLowerCase();
+    if (!query) {
+      return options;
+    }
+
+    return options.filter((option) => {
+      const label = option.label.toLowerCase();
+      const value = option.value.toLowerCase();
+      return label.includes(query) || value.includes(query);
+    });
+  }, [options, selectOneQuery]);
 
   const submitAnswer = (answer: string | string[] | File) => {
     if (disabled) {
@@ -285,18 +302,52 @@ export default function ChatInputBar({
 
   if (question.type === "select_one") {
     return (
-      <div className="chat__choices" role="list">
-        {options.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            className="choice"
-            onClick={() => submitAnswer(option.value)}
+      <div className="chat__input">
+        <div className="chat-select-one">
+          <input
+            className="chat-input__control"
+            type="text"
+            placeholder={question.placeholder ?? "Saisissez pour filtrer"}
+            value={selectOneQuery}
+            onChange={(event) => {
+              setSelectOneQuery(event.target.value);
+              setIsSelectOneOpen(true);
+            }}
+            onFocus={() => setIsSelectOneOpen(true)}
+            onBlur={() => setTimeout(() => setIsSelectOneOpen(false), 120)}
             disabled={disabled}
-          >
-            {option.label}
-          </button>
-        ))}
+            aria-label="Choisir une option"
+            aria-autocomplete="list"
+            aria-expanded={isSelectOneOpen}
+          />
+          {isSelectOneOpen ? (
+            <div className="chat-select-one__menu" role="listbox">
+              {filteredSelectOneOptions.length > 0 ? (
+                filteredSelectOneOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className="choice chat-select-one__option"
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      setSelectOneQuery(option.label);
+                      setIsSelectOneOpen(false);
+                      submitAnswer(option.value);
+                    }}
+                    disabled={disabled}
+                    role="option"
+                  >
+                    {option.label}
+                  </button>
+                ))
+              ) : (
+                <div className="chat-select-one__empty">
+                  Aucun resultat
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
       </div>
     );
   }

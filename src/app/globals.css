@@ -494,6 +494,40 @@ input[type="checkbox"] {
   gap: 8px;
 }
 
+.chat-select-one {
+  position: relative;
+}
+
+.chat-select-one__menu {
+  position: absolute;
+  z-index: 4;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--surface-alt);
+  background: var(--surface);
+  box-shadow: 0 10px 24px rgba(46, 58, 64, 0.14);
+}
+
+.chat-select-one__option {
+  width: 100%;
+  text-align: left;
+  border-radius: 10px;
+}
+
+.chat-select-one__empty {
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
 .choice {
   border-radius: 999px;
   padding: 8px 14px;
