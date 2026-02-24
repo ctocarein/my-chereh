@@ -501,7 +501,7 @@ input[type="checkbox"] {
 .chat-select-one__menu {
   position: absolute;
   z-index: 4;
-  top: calc(100% + 6px);
+  bottom: calc(100% + 10px);
   left: 0;
   right: 0;
   max-height: 220px;
@@ -514,6 +514,8 @@ input[type="checkbox"] {
   border: 1px solid var(--surface-alt);
   background: var(--surface);
   box-shadow: 0 10px 24px rgba(46, 58, 64, 0.14);
+  transform-origin: bottom center;
+  animation: chat-dropdown-up 0.18s ease-out;
 }
 
 .chat-select-one__option {
@@ -809,6 +811,18 @@ input[type="checkbox"] {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes chat-dropdown-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
