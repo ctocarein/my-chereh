@@ -1,14 +1,19 @@
 import { defaultApiClient, type ApiClient } from "./client";
 import type { Report } from "./types";
 
-export const listReports = (
+export const listReports = async (
   client: ApiClient = defaultApiClient,
-) => client.request<Report[]>("/reports");
+): Promise<Report[]> => {
+  const res = await client.request<{ data: Report[] } | Report[]>("/reports");
+  return Array.isArray(res) ? res : res.data;
+};
 
-export const getReport = (
-  reportId: string,
+export const getReport = async (
+  reportId: string | number,
   client: ApiClient = defaultApiClient,
-) =>
-  client.request<Report>(
-    `/reports/${encodeURIComponent(reportId)}`,
+): Promise<Report> => {
+  const res = await client.request<{ data: Report } | Report>(
+    `/reports/${encodeURIComponent(String(reportId))}`,
   );
+  return "data" in res ? res.data : res;
+};

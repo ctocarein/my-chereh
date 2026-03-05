@@ -78,6 +78,12 @@ export type EvaluationSession = {
   updatedAt?: string;
   completedAt?: string;
   currentQuestionId?: string | number | null;
+  expires_at?: string | null;
+  versions?: {
+    protocol?: string | null;
+    catalog_version_id?: number | null;
+    risk_model_version_id?: number | null;
+  } | null;
   current_question?: EvaluationQuestion | null;
   currentQuestion?: EvaluationQuestion | null;
 };
@@ -158,10 +164,14 @@ export type EvaluationInsight = {
   confidence_interval_low?: number | null;
   confidence_interval_high?: number | null;
   data_quality?: {
+    data_quality_score?: number;
+    answered_count?: number;
+    total_count?: number;
+    zone_boundary_distance?: number | null;
+    ci_crosses_zone_boundary?: boolean | null;
     missing_answers?: number;
     critical_missing?: boolean;
     inconsistent?: boolean;
-    data_quality_score?: number;
     notes?: unknown[];
   };
   explanations?: unknown[];
@@ -169,6 +179,7 @@ export type EvaluationInsight = {
   requires_human_validation?: boolean;
   human_validation_reason?: string | null;
   final_decision?: unknown;
+  vnext_shadow?: unknown | null;
 };
 
 export type EvaluationReport = {
@@ -180,7 +191,7 @@ export type EvaluationReport = {
 };
 
 export type EvaluationAdvanceRequest = {
-  question_id: string | number;
+  dynamic_question_template_id: string | number;
   value?: string | string[];
   file_ids?: string[];
   is_skipped?: boolean;
@@ -239,10 +250,21 @@ export type ThematicBlocDetail = ThematicBloc & {
 };
 
 export type Report = {
-  id: string;
-  sessionId: string;
-  createdAt?: string;
-  summary?: string;
+  id: string | number;
+  evaluation_session_id?: string | number | null;
+  decision_path_id?: string | number | null;
+  report_code?: string | null;
+  title?: string | null;
+  summary?: unknown;
+  answers?: unknown[];
+  score?: number | null;
+  max_score?: number | null;
+  risk_level?: string | null;
+  specialties?: string[] | null;
+  recommendation?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  evaluation_session?: EvaluationSession | null;
 };
 
 export type Identity = {

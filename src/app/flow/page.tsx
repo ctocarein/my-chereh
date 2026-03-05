@@ -1483,7 +1483,7 @@ export default function FlowPage() {
       }
 
       const payload = {
-        question_id: currentQuestionId,
+        dynamic_question_template_id: currentQuestionId,
         value: normalizedAnswer,
         ...(fileIds ? { file_ids: fileIds } : {}),
       };
