@@ -2217,6 +2217,163 @@ button.result__textarea {
   }
 }
 
+/* ─── Ambassador drawer ─────────────────────────────────────────── */
+
+.ambassador-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 400;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.ambassador-drawer {
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface, #ffffff);
+  border-radius: 20px 20px 0 0;
+  padding: 24px 20px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: profile-fade-up 0.28s ease both;
+}
+
+.ambassador-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ambassador-drawer__title {
+  font-size: clamp(1rem, 2.2vw, 1.15rem);
+  font-weight: 700;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.ambassador-drawer__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--muted, #8fa3ae) 30%, transparent);
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.ambassador-drawer__close svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+}
+
+.ambassador-drawer__desc {
+  font-size: 0.9rem;
+  color: color-mix(in srgb, var(--foreground) 65%, transparent);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.ambassador-drawer__loading {
+  font-size: 0.9rem;
+  color: var(--brand);
+  text-align: center;
+  padding: 12px 0;
+}
+
+.ambassador-drawer__link-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--brand-soft);
+  border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.ambassador-drawer__link-text {
+  flex: 1;
+  font-size: 0.8rem;
+  color: var(--foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: break-all;
+}
+
+.ambassador-drawer__copy {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: var(--brand);
+  color: #ffffff;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.ambassador-drawer__copy:hover {
+  opacity: 0.85;
+}
+
+.ambassador-drawer__copy svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+}
+
+.ambassador-drawer__whatsapp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 13px 20px;
+  border-radius: 999px;
+  border: none;
+  background: #25d366;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+  width: 100%;
+}
+
+.ambassador-drawer__whatsapp:hover {
+  opacity: 0.9;
+}
+
+.ambassador-drawer__whatsapp svg {
+  width: 20px;
+  height: 20px;
+}
+
+.ambassador-drawer__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  font-size: 0.9rem;
+  color: color-mix(in srgb, var(--foreground) 65%, transparent);
+}
+
+/* ─────────────────────────────────────────────────────────────── */
+
 @media (prefers-reduced-motion: reduce) {
 
   .chat__bubble,

@@ -380,3 +380,19 @@ export type UnlockIdentityRequest = {
 export type SecurityGateResponse = {
   security_gate: SecurityGate;
 };
+
+export type AmbassadorReferral = {
+  id: string;
+  code: string;
+  channel: string;
+  expires_at?: string | null;
+  revoked_at?: string | null;
+  created_at?: string;
+};
+
+export type AmbassadorReferralResponse = AmbassadorReferral & {
+  url: string;
+  reused: boolean;
+  remaining_weekly?: number | null;
+  message?: string;
+};
