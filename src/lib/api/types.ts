@@ -188,6 +188,7 @@ export type EvaluationReport = {
   max_score?: number | null;
   risk_level?: string | null;
   recommendation?: string | null;
+  specialties?: string[] | null;
 };
 
 export type EvaluationAdvanceRequest = {
